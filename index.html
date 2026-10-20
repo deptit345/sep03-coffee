@@ -18,7 +18,7 @@
     <header class="bg-amber-900 text-white shadow-md sticky top-0 z-50">
         <div class="container mx-auto px-4 py-3 flex flex-wrap justify-between items-center">
             <h1 class="text-xl font-bold flex items-center gap-2">
-                ☕ SEP03 COFFEE & CHA <span class="text-xs bg-amber-700 px-2 py-1 rounded text-amber-200">v3.4</span>
+                ☕ SEP03 COFFEE & CHA <span class="text-xs bg-amber-700 px-2 py-1 rounded text-amber-200">v3.5</span>
             </h1>
             <nav class="flex gap-2 text-sm mt-2 sm:mt-0 overflow-x-auto">
                 <button onclick="switchTab('orders')" id="nav-orders" class="nav-btn active px-3 py-1.5 rounded transition hover:bg-amber-800">📥 ออเดอร์ค้างทำ (<span id="order-count">0</span>)</button>
@@ -50,8 +50,12 @@
         <!-- TAB 2: RECIPES -->
         <div id="tab-recipes" class="tab-content space-y-6">
             <div class="bg-white p-6 rounded-xl shadow-sm">
-                <h2 class="text-lg font-bold text-amber-900 mb-4">➕ เพิ่ม/จัดการ เมนูและสูตร (ตั้งค่าที่ความหวาน 100%)</h2>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="recipe-form-title" class="text-lg font-bold text-amber-900">➕ เพิ่ม/จัดการ เมนูและสูตร (ตั้งค่าที่ความหวาน 100%)</h2>
+                    <button id="cancel-edit-btn" onclick="resetRecipeForm()" class="hidden text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1.5 rounded text-gray-700">ยกเลิกการแก้ไข</button>
+                </div>
                 <form onsubmit="handleAddRecipe(event)" class="space-y-4 bg-amber-50/50 p-4 rounded-xl border">
+                    <input type="hidden" id="edit-recipe-index" value="-1">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-medium text-gray-700 mb-1">ชื่อเมนู</label>
@@ -75,7 +79,7 @@
                         <div id="recipe-ing-inputs" class="space-y-2"></div>
                         <button type="button" onclick="addRecipeIngredientRow()" class="mt-2 text-xs text-amber-700 hover:underline font-medium">+ เพิ่มส่วนผสม</button>
                     </div>
-                    <button type="submit" class="bg-amber-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-900 transition">บันทึกสูตรเมนูใหม่</button>
+                    <button type="submit" id="recipe-submit-btn" class="bg-amber-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-900 transition">บันทึกสูตรเมนูใหม่</button>
                 </form>
                 <div id="recipes-list" class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
             </div>
@@ -248,7 +252,6 @@
         }
 
         function renderAll() {
-            // นับเฉพาะออเดอร์ที่ยังไม่เสร็จ (ไม่อยู่ในสถานะ 'ส่งแล้ว' หรือ 'จ่ายตังค์แล้ว')
             const activeOrders = orders.filter(o => o.status !== 'ส่งแล้ว' && o.status !== 'จ่ายตังค์แล้ว');
             const countEl = document.getElementById('order-count');
             if(countEl) countEl.innerText = activeOrders.length;
@@ -264,7 +267,6 @@
             if(!container) return;
             container.innerHTML = '';
 
-            // 🎯 ซ่อนออเดอร์ที่ "ส่งแล้ว" หรือ "จ่ายตังค์แล้ว" ออกจากหน้าจอทำของ
             const visibleOrders = orders.filter(o => o.status !== 'ส่งแล้ว' && o.status !== 'จ่ายตังค์แล้ว');
 
             if(visibleOrders.length === 0) {
@@ -374,18 +376,18 @@
             saveData();
         }
 
-        function addRecipeIngredientRow() {
+        function addRecipeIngredientRow(ingName = '', amount = '') {
             const container = document.getElementById('recipe-ing-inputs');
             if(!container) return;
             const row = document.createElement('div');
             row.className = "flex gap-2 mb-2 items-center recipe-ing-row";
-            let options = ingredients.map(i => `<option value="${i.name}">${i.name} (${i.unit})</option>`).join('');
+            let options = ingredients.map(i => `<option value="${i.name}" ${i.name === ingName ? 'selected' : ''}>${i.name} (${i.unit})</option>`).join('');
             row.innerHTML = `
                 <select class="rec-ing-name flex-1 border rounded-lg px-3 py-1.5 text-sm">
                     <option value="">-- เลือกวัตถุดิบ --</option>
                     ${options}
                 </select>
-                <input type="number" step="0.1" placeholder="ปริมาณ" class="rec-ing-amount w-28 border rounded-lg px-3 py-1.5 text-sm">
+                <input type="number" step="0.1" value="${amount}" placeholder="ปริมาณ" class="rec-ing-amount w-28 border rounded-lg px-3 py-1.5 text-sm">
                 <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 px-2">✕</button>
             `;
             container.appendChild(row);
@@ -393,6 +395,7 @@
 
         function handleAddRecipe(e) {
             e.preventDefault();
+            const editIndex = Number(document.getElementById('edit-recipe-index').value);
             const name = document.getElementById('rec-name').value;
             const price = Number(document.getElementById('rec-price').value);
             const category = document.getElementById('rec-category').value;
@@ -404,19 +407,64 @@
                 if (ingName && amount) ingList.push({ ingName, amount });
             });
             if(ingList.length === 0) { alert('กรุณาเลือกส่วนผสมอย่างน้อย 1 รายการ'); return; }
-            recipes.push({ name, price, category, ingredients: ingList });
+
+            if (editIndex > -1) {
+                recipes[editIndex] = { name, price, category, ingredients: ingList };
+                resetRecipeForm();
+            } else {
+                recipes.push({ name, price, category, ingredients: ingList });
+                document.getElementById('rec-name').value = '';
+                document.getElementById('rec-price').value = '';
+                document.getElementById('recipe-ing-inputs').innerHTML = '';
+                addRecipeIngredientRow();
+            }
+            saveData();
+        }
+
+        function editRecipe(index) {
+            const r = recipes[index];
+            document.getElementById('edit-recipe-index').value = index;
+            document.getElementById('rec-name').value = r.name;
+            document.getElementById('rec-price').value = r.price;
+            document.getElementById('rec-category').value = r.category;
+            
+            const container = document.getElementById('recipe-ing-inputs');
+            container.innerHTML = '';
+            r.ingredients.forEach(item => {
+                addRecipeIngredientRow(item.ingName, item.amount);
+            });
+
+            document.getElementById('recipe-form-title').innerText = `✏️ แก้ไขเมนู: ${r.name}`;
+            document.getElementById('recipe-submit-btn').innerText = 'บันทึกการแก้ไข';
+            document.getElementById('cancel-edit-btn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetRecipeForm() {
+            document.getElementById('edit-recipe-index').value = -1;
             document.getElementById('rec-name').value = '';
             document.getElementById('rec-price').value = '';
+            document.getElementById('rec-category').value = 'Coffee';
             document.getElementById('recipe-ing-inputs').innerHTML = '';
             addRecipeIngredientRow();
-            saveData();
+            document.getElementById('recipe-form-title').innerText = '➕ เพิ่ม/จัดการ เมนูและสูตร (ตั้งค่าที่ความหวาน 100%)';
+            document.getElementById('recipe-submit-btn').innerText = 'บันทึกสูตรเมนูใหม่';
+            document.getElementById('cancel-edit-btn').classList.add('hidden');
+        }
+
+        function deleteRecipe(index) {
+            if (confirm(`ต้องการลบเมนู "${recipes[index].name}" ใช่หรือไม่?`)) {
+                recipes.splice(index, 1);
+                resetRecipeForm();
+                saveData();
+            }
         }
 
         function renderRecipes() {
             const container = document.getElementById('recipes-list');
             if(!container) return;
             container.innerHTML = '';
-            recipes.forEach(r => {
+            recipes.forEach((r, index) => {
                 let cost = 0;
                 let ingHtml = r.ingredients.map(i => {
                     const ingObj = ingredients.find(ing => ing.name === i.ingName);
@@ -434,8 +482,12 @@
                         </div>
                         <div class="text-xs text-gray-600 space-y-1 mb-3">${ingHtml}</div>
                     </div>
-                    <div class="text-right">
-                        <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">ต้นทุนต่อแก้ว: <strong class="text-amber-900">${cost.toFixed(2)}</strong> บาท</span>
+                    <div class="flex justify-between items-center pt-3 border-t">
+                        <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">ต้นทุน: <strong class="text-amber-900">${cost.toFixed(2)}</strong> ฿</span>
+                        <div class="flex gap-2">
+                            <button onclick="editRecipe(${index})" class="bg-amber-100 text-amber-800 hover:bg-amber-200 text-xs px-2.5 py-1 rounded transition">✏️ แก้ไข</button>
+                            <button onclick="deleteRecipe(${index})" class="bg-red-100 text-red-600 hover:bg-red-200 text-xs px-2.5 py-1 rounded transition">🗑️ ลบ</button>
+                        </div>
                     </div>
                 `;
                 container.appendChild(card);
@@ -482,7 +534,6 @@
         function deleteIng(index) { ingredients.splice(index, 1); saveData(); }
 
         function renderDashboard() {
-            // 🎯 กรองเฉพาะออเดอร์ที่สถานะเป็น "จ่ายตังค์แล้ว" เท่านั้น ถึงจะเอามาคำนวณกำไรและยอดขาย
             const paidOrders = orders.filter(o => o.status === 'จ่ายตังค์แล้ว');
             let totalSales = 0, totalCost = 0;
             const tbody = document.getElementById('history-table-body');
