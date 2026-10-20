@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEP03 COFFEE & CHA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; }
+        .tab-content { display: none !important; }
+        .tab-content.active { display: block !important; }
+        .nav-btn.active { background-color: #b45309; font-weight: 600; }
+    </style>
+</head>
+<body class="bg-amber-50 text-gray-800">
+
+    <header class="bg-amber-900 text-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex flex-wrap justify-between items-center">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                ☕ SEP03 COFFEE & CHA <span class="text-xs bg-amber-700 px-2 py-1 rounded text-amber-200">v3.4</span>
+            </h1>
+            <nav class="flex gap-2 text-sm mt-2 sm:mt-0 overflow-x-auto">
+                <button onclick="switchTab('orders')" id="nav-orders" class="nav-btn active px-3 py-1.5 rounded transition hover:bg-amber-800">📥 ออเดอร์ค้างทำ (<span id="order-count">0</span>)</button>
+                <button onclick="switchTab('recipes')" id="nav-recipes" class="nav-btn px-3 py-1.5 rounded transition hover:bg-amber-800">📖 สูตร & เมนู</button>
+                <button onclick="switchTab('ingredients')" id="nav-ingredients" class="nav-btn px-3 py-1.5 rounded transition hover:bg-amber-800">💰 ราคาวัตถุดิบ & สต็อก</button>
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn px-3 py-1.5 rounded transition hover:bg-amber-800">📊 กำไร & สรุปยอด</button>
+                <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn px-3 py-1.5 rounded transition hover:bg-amber-800">⚙️ ตั้งค่า Google Sheet</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6 max-w-6xl">
+
+        <!-- TAB 1: ORDERS -->
+        <div id="tab-orders" class="tab-content active space-y-6">
+            <div class="bg-white p-4 rounded-xl shadow-sm flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-amber-900">รายการออเดอร์หน้าร้าน & หน้าจอทำเครื่องดื่ม</h2>
+                    <p class="text-xs text-gray-500">ออเดอร์ที่กด "ส่งแล้ว" หรือ "จ่ายแล้ว" จะเคลียร์ออกจากหน้านี้ทันทีเพื่อไม่ให้รกตา</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="fetchGoogleSheetOrders()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded-lg shadow transition">🔄 ดึงออเดอร์จาก Sheet</button>
+                    <button onclick="addDummyOrder()" class="bg-amber-600 hover:bg-amber-700 text-white text-sm px-4 py-2 rounded-lg shadow transition">+ จำลองออเดอร์เข้า</button>
+                </div>
+            </div>
+            <div id="orders-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+
+        <!-- TAB 2: RECIPES -->
+        <div id="tab-recipes" class="tab-content space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm">
+                <h2 class="text-lg font-bold text-amber-900 mb-4">➕ เพิ่ม/จัดการ เมนูและสูตร (ตั้งค่าที่ความหวาน 100%)</h2>
+                <form onsubmit="handleAddRecipe(event)" class="space-y-4 bg-amber-50/50 p-4 rounded-xl border">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">ชื่อเมนู</label>
+                            <input type="text" id="rec-name" placeholder="เช่น ชาไทย" class="w-full border rounded-lg px-3 py-2 text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">ราคาขายปกติ (บาท)</label>
+                            <input type="number" id="rec-price" placeholder="35" class="w-full border rounded-lg px-3 py-2 text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">หมวดหมู่</label>
+                            <select id="rec-category" class="w-full border rounded-lg px-3 py-2 text-sm">
+                                <option value="Coffee">Coffee</option>
+                                <option value="Tea">Tea</option>
+                                <option value="Non-Coffee">Non-Coffee</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">ส่วนผสมตั้งต้น (สำหรับความหวาน 100%):</label>
+                        <div id="recipe-ing-inputs" class="space-y-2"></div>
+                        <button type="button" onclick="addRecipeIngredientRow()" class="mt-2 text-xs text-amber-700 hover:underline font-medium">+ เพิ่มส่วนผสม</button>
+                    </div>
+                    <button type="submit" class="bg-amber-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-900 transition">บันทึกสูตรเมนูใหม่</button>
+                </form>
+                <div id="recipes-list" class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+        </div>
+
+        <!-- TAB 3: INGREDIENTS -->
+        <div id="tab-ingredients" class="tab-content space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm">
+                <h2 class="text-lg font-bold text-amber-900 mb-2">💰 จัดการราคาวัตถุดิบ & สต็อกคงเหลือ</h2>
+                <form onsubmit="handleAddIngredient(event)" class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6 p-4 bg-amber-50/50 rounded-xl border">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">ชื่อวัตถุดิบ</label>
+                        <input type="text" id="ing-name" placeholder="เช่น ผงชาไทย" class="w-full border rounded-lg px-3 py-2 text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">หน่วย</label>
+                        <input type="text" id="ing-unit" placeholder="กรัม" class="w-full border rounded-lg px-3 py-2 text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">ราคาต่อหน่วย (บาท)</label>
+                        <input type="number" step="0.01" id="ing-cost" placeholder="0.3" class="w-full border rounded-lg px-3 py-2 text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">ปริมาณคงเหลือ</label>
+                        <div class="flex gap-2">
+                            <input type="number" step="0.1" id="ing-stock" placeholder="1000" class="w-full border rounded-lg px-3 py-2 text-sm" required>
+                            <button type="submit" class="bg-amber-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-900">เพิ่ม</button>
+                        </div>
+                    </div>
+                </form>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-amber-100 text-amber-900 border-b">
+                                <th class="p-3">วัตถุดิบ</th>
+                                <th class="p-3">หน่วย</th>
+                                <th class="p-3">ราคาซื้อต่อหน่วย</th>
+                                <th class="p-3">คงเหลือในสต็อก</th>
+                                <th class="p-3 text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ingredients-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: DASHBOARD -->
+        <div id="tab-dashboard" class="tab-content space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-l-amber-600">
+                    <p class="text-xs text-gray-500">ยอดขายรวม (เฉพาะที่จ่ายเงินแล้ว)</p>
+                    <h3 class="text-2xl font-bold text-gray-800 mt-1"><span id="dash-total-sales">0</span> <span class="text-sm font-normal text-gray-500">บาท</span></h3>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-l-red-500">
+                    <p class="text-xs text-gray-500">ต้นทุนวัตถุดิบรวม</p>
+                    <h3 class="text-2xl font-bold text-gray-800 mt-1"><span id="dash-total-cost">0.00</span> <span class="text-sm font-normal text-gray-500">บาท</span></h3>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-l-emerald-600">
+                    <p class="text-xs text-gray-500">กำไรสุทธิ</p>
+                    <h3 class="text-2xl font-bold text-emerald-700 mt-1"><span id="dash-profit">0.00</span> <span class="text-sm font-normal text-gray-500">บาท</span></h3>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm">
+                <h3 class="font-bold text-gray-800 mb-4">📜 ประวัติออเดอร์ที่ "จ่ายเงินแล้ว" เท่านั้น</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-700 border-b">
+                                <th class="p-3">เมนู</th>
+                                <th class="p-3">ลูกค้า</th>
+                                <th class="p-3">หวาน</th>
+                                <th class="p-3">ราคาขาย</th>
+                                <th class="p-3">ต้นทุน</th>
+                                <th class="p-3">กำไร</th>
+                                <th class="p-3">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: SETTINGS -->
+        <div id="tab-settings" class="tab-content space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm space-y-4">
+                <h2 class="text-lg font-bold text-amber-900">⚙️ เชื่อมต่อ Google Sheet</h2>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Google Apps Script Web App URL</label>
+                    <input type="text" id="sheet-url-input" placeholder="https://script.google.com/macros/s/.../exec" class="w-full border rounded-lg px-3 py-2 text-sm">
+                </div>
+                <button onclick="saveSheetUrl()" class="bg-amber-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-900">บันทึกค่า</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        let ingredients = JSON.parse(localStorage.getItem('ingredients')) || [
+            { name: 'ผงชาไทย', unit: 'กรัม', costPerUnit: 0.3, stock: 1000 },
+            { name: 'ผงมัจฉะ', unit: 'กรัม', costPerUnit: 0.8, stock: 1000 },
+            { name: 'เมล็ดกาแฟ', unit: 'กรัม', costPerUnit: 0.5, stock: 1000 },
+            { name: 'นมข้น', unit: 'มล.', costPerUnit: 0.1, stock: 2000 },
+            { name: 'นมสด', unit: 'มล.', costPerUnit: 0.25, stock: 3000 },
+            { name: 'น้ำมะพร้าว', unit: 'มล.', costPerUnit: 0.2, stock: 2000 },
+            { name: 'แก้ว+หลอด', unit: 'ชิ้น', costPerUnit: 2.5, stock: 200 }
+        ];
+
+        let recipes = JSON.parse(localStorage.getItem('recipes')) || [
+            {
+                name: 'ชาไทย',
+                price: 35,
+                category: 'Tea',
+                ingredients: [
+                    { ingName: 'ผงชาไทย', amount: 15 },
+                    { ingName: 'นมข้น', amount: 30 },
+                    { ingName: 'นมสด', amount: 100 },
+                    { ingName: 'แก้ว+หลอด', amount: 1 }
+                ]
+            },
+            {
+                name: 'มัจฉะ น้ำมะพร้าว',
+                price: 50,
+                category: 'Tea',
+                ingredients: [
+                    { ingName: 'ผงมัจฉะ', amount: 8 },
+                    { ingName: 'น้ำมะพร้าว', amount: 150 },
+                    { ingName: 'แก้ว+หลอด', amount: 1 }
+                ]
+            },
+            {
+                name: 'อเมริกาโน',
+                price: 40,
+                category: 'Coffee',
+                ingredients: [
+                    { ingName: 'เมล็ดกาแฟ', amount: 18 },
+                    { ingName: 'แก้ว+หลอด', amount: 1 }
+                ]
+            }
+        ];
+
+        let orders = JSON.parse(localStorage.getItem('orders')) || [];
+        let sheetUrl = localStorage.getItem('sheetUrl') || '';
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlInput = document.getElementById('sheet-url-input');
+            if(urlInput) urlInput.value = sheetUrl;
+            addRecipeIngredientRow();
+            renderAll();
+        });
+
+        function saveData() {
+            localStorage.setItem('ingredients', JSON.stringify(ingredients));
+            localStorage.setItem('recipes', JSON.stringify(recipes));
+            localStorage.setItem('orders', JSON.stringify(orders));
+            localStorage.setItem('sheetUrl', sheetUrl);
+            renderAll();
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+
+            const targetTab = document.getElementById('tab-' + tabName);
+            const targetBtn = document.getElementById('nav-' + tabName);
+
+            if (targetTab) targetTab.classList.add('active');
+            if (targetBtn) targetBtn.classList.add('active');
+        }
+
+        function renderAll() {
+            // นับเฉพาะออเดอร์ที่ยังไม่เสร็จ (ไม่อยู่ในสถานะ 'ส่งแล้ว' หรือ 'จ่ายตังค์แล้ว')
+            const activeOrders = orders.filter(o => o.status !== 'ส่งแล้ว' && o.status !== 'จ่ายตังค์แล้ว');
+            const countEl = document.getElementById('order-count');
+            if(countEl) countEl.innerText = activeOrders.length;
+            
+            renderOrders();
+            renderRecipes();
+            renderIngredients();
+            renderDashboard();
+        }
+
+        function renderOrders() {
+            const container = document.getElementById('orders-list');
+            if(!container) return;
+            container.innerHTML = '';
+
+            // 🎯 ซ่อนออเดอร์ที่ "ส่งแล้ว" หรือ "จ่ายตังค์แล้ว" ออกจากหน้าจอทำของ
+            const visibleOrders = orders.filter(o => o.status !== 'ส่งแล้ว' && o.status !== 'จ่ายตังค์แล้ว');
+
+            if(visibleOrders.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400">🎉 ไม่มีออเดอร์ค้างทำแล้ว! (เคลียร์สะอาดหมดจด)</div>`;
+                return;
+            }
+
+            visibleOrders.forEach(order => {
+                const recipeText = getAdjustedRecipeHtml(order.menuName, order.sweetness);
+                const statusColor = {
+                    'รอทำ': 'border-l-yellow-500 bg-yellow-100 text-yellow-800',
+                    'กำลังทำ': 'border-l-blue-500 bg-blue-100 text-blue-800',
+                    'ทำเสร็จแล้ว': 'border-l-purple-500 bg-purple-100 text-purple-800'
+                }[order.status] || 'border-l-gray-300 bg-gray-100 text-gray-800';
+
+                const card = document.createElement('div');
+                card.className = `bg-white border rounded-xl shadow-sm p-5 flex flex-col justify-between border-l-4 relative ${statusColor.split(' ')[0]}`;
+                card.innerHTML = `
+                    <button onclick="deleteOrder(${order.id})" class="absolute top-3 right-3 text-gray-400 hover:text-red-600 text-sm font-bold px-1.5 py-0.5" title="ลบออเดอร์">✕</button>
+                    <div>
+                        <div class="flex justify-between items-start mb-2 pr-6">
+                            <span class="font-bold text-gray-900 text-base">${order.menuName}</span>
+                            <span class="text-xs px-2 py-1 rounded font-semibold ${statusColor.split(' ').slice(1).join(' ')}">${order.status}</span>
+                        </div>
+                        <div class="text-sm text-gray-600 space-y-1 mb-4">
+                            <p>👤 ลูกค้า: <span class="font-medium text-gray-800">${order.customer}</span></p>
+                            <p>🍬 ความหวาน: <span class="font-bold text-amber-700">${order.sweetness}%</span></p>
+                            <p>💵 ราคาขาย: <span class="font-semibold text-gray-800">${order.price}</span> บาท</p>
+                        </div>
+                        <div class="bg-amber-50/70 p-3 rounded-lg border border-amber-200 text-xs space-y-1 mb-4">
+                            <p class="font-bold text-amber-900 mb-1">🧪 สูตรชง (ปรับหวานตามจริง):</p>
+                            ${recipeText}
+                        </div>
+                    </div>
+                    <div class="space-y-2 pt-2 border-t">
+                        <div class="flex gap-1 text-xs">
+                            <button onclick="updateStatus(${order.id}, 'รอทำ')" class="flex-1 py-1 rounded bg-gray-100 hover:bg-gray-200">รอทำ</button>
+                            <button onclick="updateStatus(${order.id}, 'กำลังทำ')" class="flex-1 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200">ทำ</button>
+                            <button onclick="updateStatus(${order.id}, 'ทำเสร็จแล้ว')" class="flex-1 py-1 rounded bg-purple-100 text-purple-800 hover:bg-purple-200">เสร็จ</button>
+                        </div>
+                        <div class="flex gap-1 text-xs">
+                            <button onclick="updateStatus(${order.id}, 'จ่ายตังค์แล้ว')" class="flex-1 py-1 rounded bg-green-100 text-green-800 hover:bg-green-200 font-medium">💰 จ่ายแล้ว (เข้ากำไร)</button>
+                            <button onclick="updateStatus(${order.id}, 'ส่งแล้ว')" class="flex-1 py-1 rounded bg-gray-600 text-white hover:bg-gray-700 font-bold">🚚 ส่งแล้ว (ซ่อน)</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function getAdjustedRecipeHtml(menuName, sweetness) {
+            const recipe = recipes.find(r => r.name.trim() === menuName.trim());
+            if (!recipe) return '<span class="text-gray-400">ยังไม่ได้ตั้งสูตรเมนูนี้ในระบบ</span>';
+            const factor = sweetness / 100;
+            return recipe.ingredients.map(ing => {
+                const isSweet = ing.ingName.includes('นมข้น') || ing.ingName.includes('ไซรัป') || ing.ingName.includes('น้ำตาล');
+                const amt = isSweet ? (ing.amount * factor) : ing.amount;
+                const ingObj = ingredients.find(i => i.name === ing.ingName);
+                const unit = ingObj ? ingObj.unit : '';
+                return `<div class="flex justify-between text-gray-700"><span>${ing.ingName}</span><span class="font-semibold">${amt.toFixed(1)} ${unit}</span></div>`;
+            }).join('');
+        }
+
+        function updateStatus(id, newStatus) {
+            const order = orders.find(o => o.id === id);
+            if (order) {
+                if (newStatus === 'จ่ายตังค์แล้ว' && order.status !== 'จ่ายตังค์แล้ว') {
+                    deductStock(order);
+                }
+                order.status = newStatus;
+                saveData();
+            }
+        }
+
+        function deductStock(order) {
+            const recipe = recipes.find(r => r.name.trim() === order.menuName.trim());
+            if (!recipe) return;
+            const factor = order.sweetness / 100;
+            recipe.ingredients.forEach(item => {
+                const ing = ingredients.find(i => i.name === item.ingName);
+                if (ing) {
+                    const isSweet = item.ingName.includes('นมข้น') || item.ingName.includes('ไซรัป') || item.ingName.includes('น้ำตาล');
+                    const amt = isSweet ? (item.amount * factor) : item.amount;
+                    ing.stock = Math.max(0, Number((ing.stock - amt).toFixed(2)));
+                }
+            });
+        }
+
+        function deleteOrder(id) {
+            if (confirm('ต้องการลบออเดอร์นี้ใช่ไหม?')) {
+                orders = orders.filter(o => o.id !== id);
+                saveData();
+            }
+        }
+
+        function addDummyOrder() {
+            const sample = recipes.length > 0 ? recipes[Math.floor(Math.random() * recipes.length)] : { name: 'ชาไทย', price: 35 };
+            const sweets = [0, 25, 50, 100];
+            orders.unshift({
+                id: Date.now(),
+                menuName: sample.name,
+                customer: 'ลูกค้าหน้าร้าน',
+                sweetness: sweets[Math.floor(Math.random() * sweets.length)],
+                price: sample.price,
+                status: 'รอทำ'
+            });
+            saveData();
+        }
+
+        function addRecipeIngredientRow() {
+            const container = document.getElementById('recipe-ing-inputs');
+            if(!container) return;
+            const row = document.createElement('div');
+            row.className = "flex gap-2 mb-2 items-center recipe-ing-row";
+            let options = ingredients.map(i => `<option value="${i.name}">${i.name} (${i.unit})</option>`).join('');
+            row.innerHTML = `
+                <select class="rec-ing-name flex-1 border rounded-lg px-3 py-1.5 text-sm">
+                    <option value="">-- เลือกวัตถุดิบ --</option>
+                    ${options}
+                </select>
+                <input type="number" step="0.1" placeholder="ปริมาณ" class="rec-ing-amount w-28 border rounded-lg px-3 py-1.5 text-sm">
+                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 px-2">✕</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function handleAddRecipe(e) {
+            e.preventDefault();
+            const name = document.getElementById('rec-name').value;
+            const price = Number(document.getElementById('rec-price').value);
+            const category = document.getElementById('rec-category').value;
+            const ingRows = document.querySelectorAll('.recipe-ing-row');
+            let ingList = [];
+            ingRows.forEach(r => {
+                const ingName = r.querySelector('.rec-ing-name').value;
+                const amount = Number(r.querySelector('.rec-ing-amount').value);
+                if (ingName && amount) ingList.push({ ingName, amount });
+            });
+            if(ingList.length === 0) { alert('กรุณาเลือกส่วนผสมอย่างน้อย 1 รายการ'); return; }
+            recipes.push({ name, price, category, ingredients: ingList });
+            document.getElementById('rec-name').value = '';
+            document.getElementById('rec-price').value = '';
+            document.getElementById('recipe-ing-inputs').innerHTML = '';
+            addRecipeIngredientRow();
+            saveData();
+        }
+
+        function renderRecipes() {
+            const container = document.getElementById('recipes-list');
+            if(!container) return;
+            container.innerHTML = '';
+            recipes.forEach(r => {
+                let cost = 0;
+                let ingHtml = r.ingredients.map(i => {
+                    const ingObj = ingredients.find(ing => ing.name === i.ingName);
+                    const unit = ingObj ? ingObj.unit : '';
+                    if(ingObj) cost += i.amount * ingObj.costPerUnit;
+                    return `<div class="flex justify-between border-b pb-1"><span>${i.ingName}</span><span>${i.amount} ${unit}</span></div>`;
+                }).join('');
+                const card = document.createElement('div');
+                card.className = "border rounded-xl p-4 bg-white shadow-sm flex flex-col justify-between";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-gray-800">${r.name}</h3>
+                            <span class="text-sm font-semibold text-amber-800">${r.price} บาท</span>
+                        </div>
+                        <div class="text-xs text-gray-600 space-y-1 mb-3">${ingHtml}</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">ต้นทุนต่อแก้ว: <strong class="text-amber-900">${cost.toFixed(2)}</strong> บาท</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function handleAddIngredient(e) {
+            e.preventDefault();
+            const name = document.getElementById('ing-name').value;
+            const unit = document.getElementById('ing-unit').value;
+            const costPerUnit = Number(document.getElementById('ing-cost').value);
+            const stock = Number(document.getElementById('ing-stock').value);
+            ingredients.push({ name, unit, costPerUnit, stock });
+            document.getElementById('ing-name').value = '';
+            document.getElementById('ing-unit').value = '';
+            document.getElementById('ing-cost').value = '';
+            document.getElementById('ing-stock').value = '';
+            saveData();
+        }
+
+        function renderIngredients() {
+            const tbody = document.getElementById('ingredients-table-body');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            ingredients.forEach((ing, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b hover:bg-amber-50/50";
+                tr.innerHTML = `
+                    <td class="p-3 font-medium">${ing.name}</td>
+                    <td class="p-3 text-gray-600">${ing.unit}</td>
+                    <td class="p-3"><input type="number" step="0.01" value="${ing.costPerUnit}" onchange="updateIngCost(${index}, this.value)" class="w-24 border rounded px-2 py-1 text-sm"> บาท</td>
+                    <td class="p-3"><span class="${ing.stock < 100 ? 'text-red-600 font-bold' : 'text-gray-800'}">${ing.stock}</span></td>
+                    <td class="p-3 text-center">
+                        <button onclick="restock(${index}, 500)" class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded hover:bg-emerald-200 mr-1">+ เติม 500</button>
+                        <button onclick="deleteIng(${index})" class="text-red-500 hover:text-red-700 text-xs">ลบ</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateIngCost(index, val) { ingredients[index].costPerUnit = Number(val); saveData(); }
+        function restock(index, amt) { ingredients[index].stock += amt; saveData(); }
+        function deleteIng(index) { ingredients.splice(index, 1); saveData(); }
+
+        function renderDashboard() {
+            // 🎯 กรองเฉพาะออเดอร์ที่สถานะเป็น "จ่ายตังค์แล้ว" เท่านั้น ถึงจะเอามาคำนวณกำไรและยอดขาย
+            const paidOrders = orders.filter(o => o.status === 'จ่ายตังค์แล้ว');
+            let totalSales = 0, totalCost = 0;
+            const tbody = document.getElementById('history-table-body');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            if(paidOrders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">ยังไม่มีรายการที่กด "จ่ายเงินแล้ว"</td></tr>`;
+            }
+
+            paidOrders.forEach(o => {
+                totalSales += o.price;
+                const cost = calculateOrderCost(o);
+                totalCost += cost;
+                const profit = o.price - cost;
+                const tr = document.createElement('tr');
+                tr.className = "border-b";
+                tr.innerHTML = `
+                    <td class="p-3 font-medium">${o.menuName}</td>
+                    <td class="p-3 text-gray-600">${o.customer}</td>
+                    <td class="p-3">${o.sweetness}%</td>
+                    <td class="p-3">${o.price} ฿</td>
+                    <td class="p-3 text-red-600">${cost.toFixed(2)} ฿</td>
+                    <td class="p-3 text-emerald-600 font-bold">${profit.toFixed(2)} ฿</td>
+                    <td class="p-3"><span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">${o.status}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('dash-total-sales').innerText = totalSales;
+            document.getElementById('dash-total-cost').innerText = totalCost.toFixed(2);
+            document.getElementById('dash-profit').innerText = (totalSales - totalCost).toFixed(2);
+        }
+
+        function calculateOrderCost(order) {
+            const recipe = recipes.find(r => r.name.trim() === order.menuName.trim());
+            if (!recipe) return 0;
+            const factor = order.sweetness / 100;
+            let cost = 0;
+            recipe.ingredients.forEach(item => {
+                const ing = ingredients.find(i => i.name === item.ingName);
+                if (ing) {
+                    const isSweet = item.ingName.includes('นมข้น') || item.ingName.includes('ไซรัป') || item.ingName.includes('น้ำตาล');
+                    const amt = isSweet ? (item.amount * factor) : item.amount;
+                    cost += amt * ing.costPerUnit;
+                }
+            });
+            return cost;
+        }
+
+        function saveSheetUrl() {
+            sheetUrl = document.getElementById('sheet-url-input').value;
+            saveData();
+            alert('บันทึก Web App URL เรียบร้อย');
+        }
+
+        async function fetchGoogleSheetOrders() {
+            if (!sheetUrl) { alert('กรุณาใส่ Google Apps Script URL ก่อนครับ'); switchTab('settings'); return; }
+            try {
+                let res = await fetch(sheetUrl);
+                let data = await res.json();
+                if (Array.isArray(data)) { orders = data; saveData(); alert('ดึงออเดอร์สำเร็จ!'); }
+            } catch (err) { alert('ดึงข้อมูลไม่สำเร็จ ตรวจสอบ URL'); }
+        }
+    </script>
+</body>
+</html>
