@@ -18,7 +18,7 @@
     <header class="bg-amber-900 text-white shadow-md sticky top-0 z-50">
         <div class="container mx-auto px-4 py-3 flex flex-wrap justify-between items-center">
             <h1 class="text-xl font-bold flex items-center gap-2">
-                ☕ SEP03 COFFEE & CHA <span class="text-xs bg-amber-700 px-2 py-1 rounded text-amber-200">v3.5</span>
+                ☕ SEP03 COFFEE & CHA <span class="text-xs bg-amber-700 px-2 py-1 rounded text-amber-200">v3.6 (Cloud Sync)</span>
             </h1>
             <nav class="flex gap-2 text-sm mt-2 sm:mt-0 overflow-x-auto">
                 <button onclick="switchTab('orders')" id="nav-orders" class="nav-btn active px-3 py-1.5 rounded transition hover:bg-amber-800">📥 ออเดอร์ค้างทำ (<span id="order-count">0</span>)</button>
@@ -40,7 +40,7 @@
                     <p class="text-xs text-gray-500">ออเดอร์ที่กด "ส่งแล้ว" หรือ "จ่ายแล้ว" จะเคลียร์ออกจากหน้านี้ทันทีเพื่อไม่ให้รกตา</p>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="fetchGoogleSheetOrders()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded-lg shadow transition">🔄 ดึงออเดอร์จาก Sheet</button>
+                    <button onclick="syncAllFromSheet()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded-lg shadow transition flex items-center gap-1">🔄 ซิงค์ข้อมูลกับ Sheet</button>
                     <button onclick="addDummyOrder()" class="bg-amber-600 hover:bg-amber-700 text-white text-sm px-4 py-2 rounded-lg shadow transition">+ จำลองออเดอร์เข้า</button>
                 </div>
             </div>
@@ -167,12 +167,12 @@
         <!-- TAB 5: SETTINGS -->
         <div id="tab-settings" class="tab-content space-y-6">
             <div class="bg-white p-6 rounded-xl shadow-sm space-y-4">
-                <h2 class="text-lg font-bold text-amber-900">⚙️ เชื่อมต่อ Google Sheet</h2>
+                <h2 class="text-lg font-bold text-amber-900">⚙️ เชื่อมต่อ Google Sheet (คลาวด์กลาง)</h2>
                 <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Google Apps Script Web App URL</label>
                     <input type="text" id="sheet-url-input" placeholder="https://script.google.com/macros/s/.../exec" class="w-full border rounded-lg px-3 py-2 text-sm">
                 </div>
-                <button onclick="saveSheetUrl()" class="bg-amber-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-900">บันทึกค่า</button>
+                <button onclick="saveSheetUrl()" class="bg-amber-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-900">บันทึกค่า & เริ่มซิงค์</button>
             </div>
         </div>
 
@@ -230,6 +230,10 @@
             if(urlInput) urlInput.value = sheetUrl;
             addRecipeIngredientRow();
             renderAll();
+
+            if (sheetUrl) {
+                syncAllFromSheet();
+            }
         });
 
         function saveData() {
@@ -238,6 +242,34 @@
             localStorage.setItem('orders', JSON.stringify(orders));
             localStorage.setItem('sheetUrl', sheetUrl);
             renderAll();
+        }
+
+        async function pushToCloud(type, items) {
+            if (!sheetUrl) return;
+            try {
+                await fetch(sheetUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: type, items: items })
+                });
+            } catch (e) {
+                console.error("Cloud push failed", e);
+            }
+        }
+
+        async function syncAllFromSheet() {
+            if (!sheetUrl) return;
+            try {
+                let res = await fetch(sheetUrl + '?action=getAllData');
+                let data = await res.json();
+                if (data.recipes && data.recipes.length > 0) recipes = data.recipes;
+                if (data.ingredients && data.ingredients.length > 0) ingredients = data.ingredients;
+                if (data.orders && data.orders.length > 0) orders = data.orders;
+                saveData();
+            } catch (err) {
+                console.log("Cloud sync error");
+            }
         }
 
         function switchTab(tabName) {
@@ -270,7 +302,7 @@
             const visibleOrders = orders.filter(o => o.status !== 'ส่งแล้ว' && o.status !== 'จ่ายตังค์แล้ว');
 
             if(visibleOrders.length === 0) {
-                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400">🎉 ไม่มีออเดอร์ค้างทำแล้ว! (เคลียร์สะอาดหมดจด)</div>`;
+                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400">🎉 ไม่มีออเดอร์ค้างทำแล้ว!</div>`;
                 return;
             }
 
@@ -285,7 +317,7 @@
                 const card = document.createElement('div');
                 card.className = `bg-white border rounded-xl shadow-sm p-5 flex flex-col justify-between border-l-4 relative ${statusColor.split(' ')[0]}`;
                 card.innerHTML = `
-                    <button onclick="deleteOrder(${order.id})" class="absolute top-3 right-3 text-gray-400 hover:text-red-600 text-sm font-bold px-1.5 py-0.5" title="ลบออเดอร์">✕</button>
+                    <button onclick="deleteOrder(${order.id})" class="absolute top-3 right-3 text-gray-400 hover:text-red-600 text-sm font-bold px-1.5 py-0.5">✕</button>
                     <div>
                         <div class="flex justify-between items-start mb-2 pr-6">
                             <span class="font-bold text-gray-900 text-base">${order.menuName}</span>
@@ -308,8 +340,8 @@
                             <button onclick="updateStatus(${order.id}, 'ทำเสร็จแล้ว')" class="flex-1 py-1 rounded bg-purple-100 text-purple-800 hover:bg-purple-200">เสร็จ</button>
                         </div>
                         <div class="flex gap-1 text-xs">
-                            <button onclick="updateStatus(${order.id}, 'จ่ายตังค์แล้ว')" class="flex-1 py-1 rounded bg-green-100 text-green-800 hover:bg-green-200 font-medium">💰 จ่ายแล้ว (เข้ากำไร)</button>
-                            <button onclick="updateStatus(${order.id}, 'ส่งแล้ว')" class="flex-1 py-1 rounded bg-gray-600 text-white hover:bg-gray-700 font-bold">🚚 ส่งแล้ว (ซ่อน)</button>
+                            <button onclick="updateStatus(${order.id}, 'จ่ายตังค์แล้ว')" class="flex-1 py-1 rounded bg-green-100 text-green-800 hover:bg-green-200 font-medium">💰 จ่ายแล้ว</button>
+                            <button onclick="updateStatus(${order.id}, 'ส่งแล้ว')" class="flex-1 py-1 rounded bg-gray-600 text-white hover:bg-gray-700 font-bold">🚚 ส่งแล้ว</button>
                         </div>
                     </div>
                 `;
@@ -319,7 +351,7 @@
 
         function getAdjustedRecipeHtml(menuName, sweetness) {
             const recipe = recipes.find(r => r.name.trim() === menuName.trim());
-            if (!recipe) return '<span class="text-gray-400">ยังไม่ได้ตั้งสูตรเมนูนี้ในระบบ</span>';
+            if (!recipe) return '<span class="text-gray-400">ยังไม่ได้ตั้งสูตรเมนูนี้</span>';
             const factor = sweetness / 100;
             return recipe.ingredients.map(ing => {
                 const isSweet = ing.ingName.includes('นมข้น') || ing.ingName.includes('ไซรัป') || ing.ingName.includes('น้ำตาล');
@@ -338,6 +370,8 @@
                 }
                 order.status = newStatus;
                 saveData();
+                pushToCloud('orders', orders);
+                pushToCloud('ingredients', ingredients);
             }
         }
 
@@ -359,6 +393,7 @@
             if (confirm('ต้องการลบออเดอร์นี้ใช่ไหม?')) {
                 orders = orders.filter(o => o.id !== id);
                 saveData();
+                pushToCloud('orders', orders);
             }
         }
 
@@ -374,6 +409,7 @@
                 status: 'รอทำ'
             });
             saveData();
+            pushToCloud('orders', orders);
         }
 
         function addRecipeIngredientRow(ingName = '', amount = '') {
@@ -419,6 +455,7 @@
                 addRecipeIngredientRow();
             }
             saveData();
+            pushToCloud('recipes', recipes);
         }
 
         function editRecipe(index) {
@@ -457,6 +494,7 @@
                 recipes.splice(index, 1);
                 resetRecipeForm();
                 saveData();
+                pushToCloud('recipes', recipes);
             }
         }
 
@@ -506,6 +544,7 @@
             document.getElementById('ing-cost').value = '';
             document.getElementById('ing-stock').value = '';
             saveData();
+            pushToCloud('ingredients', ingredients);
         }
 
         function renderIngredients() {
@@ -529,9 +568,21 @@
             });
         }
 
-        function updateIngCost(index, val) { ingredients[index].costPerUnit = Number(val); saveData(); }
-        function restock(index, amt) { ingredients[index].stock += amt; saveData(); }
-        function deleteIng(index) { ingredients.splice(index, 1); saveData(); }
+        function updateIngCost(index, val) { 
+            ingredients[index].costPerUnit = Number(val); 
+            saveData(); 
+            pushToCloud('ingredients', ingredients);
+        }
+        function restock(index, amt) { 
+            ingredients[index].stock += amt; 
+            saveData(); 
+            pushToCloud('ingredients', ingredients);
+        }
+        function deleteIng(index) { 
+            ingredients.splice(index, 1); 
+            saveData(); 
+            pushToCloud('ingredients', ingredients);
+        }
 
         function renderDashboard() {
             const paidOrders = orders.filter(o => o.status === 'จ่ายตังค์แล้ว');
@@ -586,16 +637,8 @@
         function saveSheetUrl() {
             sheetUrl = document.getElementById('sheet-url-input').value;
             saveData();
-            alert('บันทึก Web App URL เรียบร้อย');
-        }
-
-        async function fetchGoogleSheetOrders() {
-            if (!sheetUrl) { alert('กรุณาใส่ Google Apps Script URL ก่อนครับ'); switchTab('settings'); return; }
-            try {
-                let res = await fetch(sheetUrl);
-                let data = await res.json();
-                if (Array.isArray(data)) { orders = data; saveData(); alert('ดึงออเดอร์สำเร็จ!'); }
-            } catch (err) { alert('ดึงข้อมูลไม่สำเร็จ ตรวจสอบ URL'); }
+            syncAllFromSheet();
+            alert('บันทึก Web App URL และซิงค์ข้อมูลเรียบร้อย!');
         }
     </script>
 </body>
